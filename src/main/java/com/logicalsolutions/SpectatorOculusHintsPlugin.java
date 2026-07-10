@@ -7,6 +7,7 @@ import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.events.ClientTick;
+import net.runelite.api.events.MenuOpened;
 import net.runelite.api.events.PostMenuSort;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.VarClientID;
@@ -45,6 +46,9 @@ public class SpectatorOculusHintsPlugin extends Plugin
 	private boolean hidingHints;
 	private int previousOculusHideHint;
 	private int previousAllstarOculusHideHint;
+	private MenuEntry[] savedMenuEntries;
+	private String[] savedOptions;
+	private String[] savedTargets;
 
 	@Override
 	protected void startUp()
@@ -55,6 +59,7 @@ public class SpectatorOculusHintsPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		clearSavedMenu();
 		restoreHints();
 		log.debug("Spectator Oculus Hints stopped");
 	}
@@ -77,12 +82,14 @@ public class SpectatorOculusHintsPlugin extends Plugin
 	{
 		if (!isSpectatorOculusActive())
 		{
+			clearSavedMenu();
 			return;
 		}
 
 		MenuEntry[] menuEntries = client.getMenuEntries();
 		if (menuEntries.length == 0)
 		{
+			clearSavedMenu();
 			return;
 		}
 
@@ -91,12 +98,28 @@ public class SpectatorOculusHintsPlugin extends Plugin
 		boolean hideWalkHere = topEntry.getType() == MenuAction.WALK && !hasPlayerEntry(menuEntries);
 		if (!hideWidgetHover && !hideWalkHere)
 		{
+			clearSavedMenu();
 			return;
 		}
 
+		saveMenu(menuEntries);
 		topEntry.setOption("");
 		topEntry.setTarget("");
 		client.setMenuEntries(new MenuEntry[] {topEntry});
+	}
+
+	@Subscribe
+	public void onMenuOpened(MenuOpened event)
+	{
+		if (!isSpectatorOculusActive() || savedMenuEntries == null)
+		{
+			return;
+		}
+
+		restoreSavedMenuText();
+		event.setMenuEntries(savedMenuEntries);
+		client.setMenuEntries(savedMenuEntries);
+		clearSavedMenu();
 	}
 
 	private boolean isSpectatorOculusActive()
@@ -143,6 +166,35 @@ public class SpectatorOculusHintsPlugin extends Plugin
 		}
 
 		return false;
+	}
+
+	private void saveMenu(MenuEntry[] menuEntries)
+	{
+		savedMenuEntries = Arrays.copyOf(menuEntries, menuEntries.length);
+		savedOptions = new String[menuEntries.length];
+		savedTargets = new String[menuEntries.length];
+
+		for (int i = 0; i < menuEntries.length; i++)
+		{
+			savedOptions[i] = menuEntries[i].getOption();
+			savedTargets[i] = menuEntries[i].getTarget();
+		}
+	}
+
+	private void restoreSavedMenuText()
+	{
+		for (int i = 0; i < savedMenuEntries.length; i++)
+		{
+			savedMenuEntries[i].setOption(savedOptions[i]);
+			savedMenuEntries[i].setTarget(savedTargets[i]);
+		}
+	}
+
+	private void clearSavedMenu()
+	{
+		savedMenuEntries = null;
+		savedOptions = null;
+		savedTargets = null;
 	}
 
 	private void hideHints()
