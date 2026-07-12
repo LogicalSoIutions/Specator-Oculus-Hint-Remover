@@ -1,5 +1,6 @@
 package com.logicalsolutions;
 
+import com.google.inject.Provides;
 import java.util.Arrays;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -12,15 +13,17 @@ import net.runelite.api.events.PostMenuSort;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.VarClientID;
 import net.runelite.api.widgets.Widget;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.overlay.OverlayManager;
 
 @Slf4j
 @PluginDescriptor(
 	name = "Spectator Oculus Hints",
-	description = "Hides top-left hover text while using spectator oculus views.",
-	tags = {"spectator", "oculus", "menu", "tooltip"}
+	description = "Hides top-left hover text and restores overhead player names while using spectator oculus views.",
+	tags = {"spectator", "oculus", "menu", "tooltip", "players", "names"}
 )
 public class SpectatorOculusHintsPlugin extends Plugin
 {
@@ -43,6 +46,12 @@ public class SpectatorOculusHintsPlugin extends Plugin
 	@Inject
 	private Client client;
 
+	@Inject
+	private OverlayManager overlayManager;
+
+	@Inject
+	private SpectatorOculusHintsOverlay overlay;
+
 	private boolean hidingHints;
 	private int previousOculusHideHint;
 	private int previousAllstarOculusHideHint;
@@ -50,15 +59,23 @@ public class SpectatorOculusHintsPlugin extends Plugin
 	private String[] savedOptions;
 	private String[] savedTargets;
 
+	@Provides
+	SpectatorOculusHintsConfig provideConfig(ConfigManager configManager)
+	{
+		return configManager.getConfig(SpectatorOculusHintsConfig.class);
+	}
+
 	@Override
 	protected void startUp()
 	{
+		overlayManager.add(overlay);
 		log.debug("Spectator Oculus Hints started");
 	}
 
 	@Override
 	protected void shutDown()
 	{
+		overlayManager.remove(overlay);
 		clearSavedMenu();
 		restoreHints();
 		log.debug("Spectator Oculus Hints stopped");
@@ -122,7 +139,7 @@ public class SpectatorOculusHintsPlugin extends Plugin
 		clearSavedMenu();
 	}
 
-	private boolean isSpectatorOculusActive()
+	boolean isSpectatorOculusActive()
 	{
 		return isVisible(InterfaceID.ToplevelSpectator.VIEWPORT)
 			|| isVisible(InterfaceID.DeadmanSpectator.UNIVERSE)
